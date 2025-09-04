@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Moje linki – strona startowa</title>
+  <meta name="description" content="Jednostronicowa, responsywna lista linków z ikonami, nagłówkami i nazwami. Wczytaj plik .txt/.csv/.json lub wklej listę. Obsługa nagłówków zaczynających się od *" />
+  <style>
+    :root{
+      --bg: #0b0e14;
+      --panel: #121826;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --accent: #22c55e;
+      --card: #0f172a;
+      --ring: #334155;
+      --radius: 16px;
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f7f7fb; --panel:#ffffff; --muted:#6b7280; --text:#0f172a; --accent:#16a34a; --card:#ffffff; --ring:#e5e7eb; }
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{ margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Noto Sans", Arial, sans-serif; }
+    header{ position:sticky; top:0; z-index:10; backdrop-filter:saturate(150%) blur(8px); background: color-mix(in oklab, var(--bg) 70%, transparent); border-bottom:1px solid var(--ring); }
+    .container{ max-width:1100px; margin:0 auto; padding:clamp(12px,2vw,20px); }
+    .bar{ display:grid; gap:12px; align-items:center; grid-template-columns:1fr auto auto }
+    @media (max-width:700px){ .bar{ grid-template-columns:1fr } }
+    .title{ font-weight:700; font-size:clamp(18px,2.2vw,22px); letter-spacing:.2px }
+    .controls{ display:flex; gap:10px; flex-wrap:wrap; justify-self:end }
+    .btn, label.btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:999px; border:1px solid var(--ring); background:var(--panel); color:var(--text); cursor:pointer; text-decoration:none }
+    .btn:hover{ outline:2px solid color-mix(in oklab, var(--accent) 40%, transparent); outline-offset:2px }
+    .btn.secondary{ background:transparent }
+    input[type="file"]{ display:none }
+    .search{ width:100%; background:var(--panel); border:1px solid var(--ring); border-radius:999px; padding:10px 14px; color:var(--text) }
+    .hint{ color:var(--muted); font-size:14px }
+
+    main{ padding-top:8px }
+    .section-title{ font-weight:800; text-transform:uppercase; font-size:30px; /* 2x względem 15px etykiet kart */
+      letter-spacing:.5px; margin:22px 6px 8px; }
+    .grid{ display:grid; gap:12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    .card{ display:flex; align-items:center; gap:12px; padding:14px; border-radius:var(--radius); background:var(--card); border:1px solid var(--ring); min-height:66px; text-decoration:none; color:inherit; transition:transform .12s ease, box-shadow .12s ease }
+    .card:hover{ transform:translateY(-2px); box-shadow:0 6px 20px color-mix(in oklab, black 20%, transparent) }
+    .favicon{ width:28px; height:28px; border-radius:8px; flex:0 0 28px; display:grid; place-items:center; overflow:hidden; background:#0ea5e9 }
+    .favicon img{ width:100%; height:100%; object-fit:cover }
+    .name{ font-weight:600; font-size:15px; line-height:1.2 }
+    .host{ color:var(--muted); font-size:12px }
+    .meta{ display:flex; flex-direction:column; min-width:0 }
+    .dropzone{ border:2px dashed var(--ring); border-radius:var(--radius); padding:14px; text-align:center; color:var(--muted) }
+
+    details.help{ margin-top:12px }
+    details.help>summary{ cursor:pointer; padding:8px 0; color:var(--muted) }
+    code.inline{ background: color-mix(in oklab, var(--ring) 30%, transparent); padding:2px 6px; border-radius:6px }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container bar" role="region" aria-label="Pasek narzędzi">
+      <div class="title">Moje linki</div>
+      <input id="file" type="file" accept=".txt,.csv,.json" />
+      <div class="controls">
+        <label class="btn" for="file" title="Wczytaj plik .txt/.csv/.json z listą linków">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 12l-3.5-3.5M12 16l3.5-3.5M4 20h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          Wczytaj plik
+        </label>
+        <button id="pasteBtn" class="btn secondary" type="button">Wklej listę</button>
+        <button id="clearBtn" class="btn secondary" type="button" title="Wyczyść zapisane linki">Wyczyść</button>
+      </div>
+      <input id="search" class="search" type="search" placeholder="Szukaj… (filtruje po nazwie i domenie)" aria-label="Szukaj linku" />
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="drop" class="dropzone" aria-label="Strefa upuszczania pliku">Przeciągnij i upuść plik tutaj – lub użyj przycisku „Wczytaj plik”.</div>
+    <p class="hint">Obsługiwane formaty plików: <code class="inline">.txt</code> (po jednym URL lub nagłówku z gwiazdką w linii), <code class="inline">.csv</code>/<code class="inline">.txt</code> (np. <code class="inline">nazwa; url</code> lub <code class="inline">nazwa, url</code> oraz linia z <code class="inline">*Nagłówek</code>), oraz <code class="inline">.json</code> (opcjonalnie obiekty z polami <code class="inline">name/url</code> lub <code class="inline">{header:true, title:\"…\"}</code>).</p>
+
+    <details class="help">
+      <summary>Formaty wejściowe – przykłady z nagłówkami</summary>
+      <pre aria-label="Przykłady formatów">TXT (kolejność zachowana):
+*Informacyjne:
+https://example.com
+YouTube.com
+*Sklepy:
+Allegro.pl
+
+CSV (średnik lub przecinek):
+*Ulubione
+Google; https://google.com
+YouTube, https://youtube.com
+
+JSON (opcjonalny format rozszerzony):
+[
+  {"header": true, "title": "Informacyjne"},
+  {"name": "OpenAI", "url": "https://openai.com"}
+]
+      </pre>
+    </details>
+
+    <div id="content" aria-live="polite" aria-busy="false"></div>
+  </main>
+
+  <dialog id="pasteDialog">
+    <form method="dialog" style="max-width:800px; width:min(90vw, 800px); border:none; padding:0; background:transparent;">
+      <div style="background:var(--panel); border:1px solid var(--ring); border-radius:16px; overflow:hidden;">
+        <div style="padding:14px 16px; font-weight:700; border-bottom:1px solid var(--ring);">Wklej listę linków</div>
+        <div style="padding:12px 16px;">
+          <textarea id="pasteArea" rows="10" style="width:100%; border-radius:12px; border:1px solid var(--ring); background:var(--bg); color:var(--text); padding:10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" placeholder="Wklej: URL per linia; lub CSV (nazwa; url); dodaj nagłówki w liniach zaczynających się od *"></textarea>
+          <p class="hint">Kolejność elementów z pliku/tekstu jest zachowana. Nagłówki: linia zaczynająca się od <code class="inline">*</code>.</p>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--ring);">
+          <button type="reset" class="btn secondary" value="cancel">Anuluj</button>
+          <button id="pasteImport" type="button" class="btn">Importuj</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="cardTpl">
+    <a class="card" target="_blank" rel="noopener noreferrer" draggable="false">
+      <div class="favicon" aria-hidden="true"><img alt="" loading="lazy" referrerpolicy="no-referrer" /></div>
+      <div class="meta">
+        <div class="name"></div>
+        <div class="host"></div>
+      </div>
+    </a>
+  </template>
+
+  <script>
+  (function(){
+    const fileInput = document.getElementById('file');
+    const content = document.getElementById('content');
+    const search = document.getElementById('search');
+    const drop = document.getElementById('drop');
+    const clearBtn = document.getElementById('clearBtn');
+    const pasteBtn = document.getElementById('pasteBtn');
+    const pasteDialog = document.getElementById('pasteDialog');
+    const pasteArea = document.getElementById('pasteArea');
+    const pasteImport = document.getElementById('pasteImport');
+    const tpl = document.getElementById('cardTpl');
+
+    /** @typedef {{kind:'header', title:string} | {kind:'link', name:string, url:string}} Item */
+    /** @type {Item[]} */
+    let items = [];
+
+    const KEY = 'start_links_v2_ordered_headers';
+
+    // --- Utils ---
+    const normalizeURL = (raw) => {
+      if(!raw) return null; let s = String(raw).trim(); if(!s) return null;
+      s = s.replace(/^\s*\"|\"\s*$/g, '').replace(/^\s*'|'\s*$/g, '');
+      if(/^\*/.test(s)) return null; // nagłówek, nie URL
+      if(!/^https?:\/\//i.test(s)) s = 'https://' + s;
+      try{ new URL(s); return s; }catch{ return null; }
+    };
+
+    const hostFromURL = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
+    const defaultName = (u) => hostFromURL(u).replace(/^www\./,'').split(/[\.-]/).map(p=>p.charAt(0).toUpperCase()+p.slice(1)).join(' ');
+
+    // --- Rendering ---
+    function render(list){
+      content.setAttribute('aria-busy','true');
+      content.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      let currentGrid = null;
+      const ensureGrid = () => { if(!currentGrid){ currentGrid = document.createElement('div'); currentGrid.className = 'grid'; frag.appendChild(currentGrid); } };
+
+      for(const it of list){
+        if(it.kind === 'header'){
+          currentGrid = null;
+          const h = document.createElement('div');
+          h.className = 'section-title';
+          h.textContent = String(it.title||'').trim().replace(/:$/, '');
+          frag.appendChild(h);
+          currentGrid = document.createElement('div'); currentGrid.className = 'grid'; frag.appendChild(currentGrid);
+        } else if(it.kind === 'link'){
+          ensureGrid();
+          const {name, url} = it; const host = hostFromURL(url);
+          const node = tpl.content.firstElementChild.cloneNode(true);
+          node.href = url; node.title = `${name} — ${host}`; node.setAttribute('aria-label', name);
+          const img = node.querySelector('img');
+          img.src = `https://icons.duckduckgo.com/ip3/${host}.ico`;
+          img.onerror = () => { img.onerror = null; img.src = `https://www.google.com/s2/favicons?domain=${host}&sz=64`; };
+          node.querySelector('.name').textContent = name || defaultName(url);
+          node.querySelector('.host').textContent = host.replace(/^www\./,'');
+          currentGrid.appendChild(node);
+        }
+      }
+      content.appendChild(frag);
+      content.setAttribute('aria-busy','false');
+    }
+
+    function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(items)); }catch(e){} }
+    function restore(){
+      try{
+        const raw = localStorage.getItem(KEY); if(!raw) return;
+        const arr = JSON.parse(raw); if(Array.isArray(arr)) { items = arr; render(filter(search.value, items)); }
+      }catch{}
+    }
+
+    // --- Parsing ---
+    function parseCSVLine(line){
+      const parts = line.split(/\s*[;,]\s*/);
+      if(parts.length >= 2) return { left: parts[0], right: parts[1] };
+      return null;
+    }
+
+    function parseText(text){
+      const out = []; const trimmed = String(text||'').trim();
+      if(!trimmed) return out;
+
+      // JSON
+      if(/^\s*\[/.test(trimmed)){
+        try{
+          const arr = JSON.parse(trimmed);
+          for(const it of arr){
+            if(it && (it.header || it.kind==='header')){ out.push({kind:'header', title: String(it.title||it.name||'').trim()}); continue; }
+            const url = normalizeURL(it.url || it.link || it.href);
+            if(url){ out.push({kind:'link', name: String(it.name||it.title||defaultName(url)), url}); }
+          }
+          return out;
+        }catch{}
+      }
+
+      const lines = trimmed.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      for(const line of lines){
+        const headerMatch = line.match(/^\*\s*(.+?)\s*:?\s*$/);
+        if(headerMatch){ out.push({kind:'header', title: headerMatch[1]}); continue; }
+
+        const pair = parseCSVLine(line);
+        if(pair){
+          if(/^\*/.test(pair.left||'')){
+            const t = pair.left.replace(/^\*\s*/, '');
+            out.push({kind:'header', title: t});
+            continue;
+          }
+          const url = normalizeURL(pair.right);
+          if(url){ out.push({kind:'link', name: pair.left || defaultName(url), url}); continue; }
+        }
+
+        const url = normalizeURL(line);
+        if(url){ out.push({kind:'link', name: defaultName(url), url}); }
+      }
+      return out;
+    }
+
+    async function handleFile(file){ if(!file) return; const text = await file.text(); ingest(parseText(text)); }
+
+    function ingest(arr){
+      if(!Array.isArray(arr) || arr.length===0){ alert('Nie znaleziono żadnych pozycji w pliku/tekście.'); return; }
+      const normalized = arr.map(it=>{
+        if(it.kind==='header') return {kind:'header', title:String(it.title||'').trim()};
+        return {kind:'link', name:String(it.name||'').trim(), url:it.url};
+      }).filter(it=> it.kind==='header' || !!it.url);
+
+      const seenUrls = new Set();
+      const out = [];
+      let lastHeaderTitle = null;
+      for(const it of normalized){
+        if(it.kind==='header'){
+          const title = it.title.replace(/:$/, '');
+          if(title && title !== lastHeaderTitle){ out.push({kind:'header', title}); lastHeaderTitle = title; }
+          continue;
+        }
+        const u = it.url.replace(/\/$/, '');
+        if(!seenUrls.has(u)){
+          out.push({kind:'link', name: it.name || defaultName(it.url), url: it.url});
+          seenUrls.add(u);
+        }
+      }
+      items = out; persist(); render(items);
+    }
+
+    // Filtering: keep headers that have at least one matching link in their section
+    function filter(q, arr){
+      q = String(q||'').trim().toLowerCase(); if(!q) return arr;
+      const out = []; let buffer = []; let currentHeader = null;
+      const flush = () => { if(buffer.length){ if(currentHeader) out.push(currentHeader); out.push(...buffer); } buffer = []; };
+      for(const it of arr){
+        if(it.kind==='header'){ flush(); currentHeader = it; continue; }
+        const hay = (it.name+' '+hostFromURL(it.url)).toLowerCase();
+        if(hay.includes(q)) buffer.push(it);
+      }
+      flush();
+      return out;
+    }
+
+    // --- Events ---
+    fileInput.addEventListener('change', (e)=> handleFile(e.target.files?.[0]));
+
+    ;['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.style.borderColor = 'var(--accent)'; }));
+    ;['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.style.borderColor = 'var(--ring)'; }));
+    drop.addEventListener('drop', (e)=>{ const f = e.dataTransfer?.files?.[0]; if(f) handleFile(f); });
+
+    search.addEventListener('input', ()=> render(filter(search.value, items)));
+
+    clearBtn.addEventListener('click', ()=>{ if(confirm('Usunąć zapisane pozycje z tej przeglądarki?')){ items = []; persist(); render([]); } });
+
+    pasteBtn.addEventListener('click', ()=>{ pasteArea.value=''; pasteDialog.showModal(); pasteArea.focus(); });
+    pasteImport.addEventListener('click', ()=>{ const arr = parseText(pasteArea.value); pasteDialog.close('ok'); ingest(arr); });
+
+    // First paint
+    restore();
+  })();
+  </script>
+</body>
+</html>
